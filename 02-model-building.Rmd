@@ -1,0 +1,57 @@
+---
+title: "R Notebook"
+output: 
+---
+
+```{r}
+hep <- read_csv("hepatitis.csv")
+
+hep_lm <- lm(class ~ . , data = hepatitis)
+
+coef(hep_lm)))
+as.data.frame(coef(hep_lm)) %>%
+        bind_cols(confint(hep_lm)) %>%
+        rownames_to_column() #%>%
+        filter(rowname=='treat') %>%
+        rename(estimate=`coef(lm)`, ci.lower=`2.5 %`, ci.upper=`97.5 %`) %>%
+        mutate(model='LinReg') %>%
+        relocate(model, .before=1) %>%
+        select(-rowname)
+
+ate_lm <- as.data.frame(coef(lm)) %>%
+        bind_cols(confint(lm)) %>%
+        rownames_to_column() %>%
+        filter(rowname=='treat') %>%
+        rename(estimate=`coef(lm)`, ci.lower=`2.5 %`, ci.upper=`97.5 %`) %>%
+        mutate(model='LinReg') %>%
+        relocate(model, .before=1) %>%
+        select(-rowname)
+  
+#BART
+
+bc_fit <- bartc(lalonde[,'re78'], lalonde[,'treat'], lalonde[,3:8], n.samples = 1000L, estimand='ate',
+                method.rsp='bart', method.trt='glm', verbose = FALSE) 
+
+
+ate_bart <- summary(bc_fit)$estimates %>%
+            select(-sd) %>%
+            mutate(model='BART')  %>%
+            relocate(model, .before=1)
+
+#Prepare ATE-Output
+ate <- ate_lm %>%
+      bind_rows(ate_bart)
+
+rownames(ate) <- NULL
+
+kable(
+  ate,
+  format="html", 
+  digits = 2,
+  caption = "Table 2: Treatment effect on income"
+) %>%
+  kable_classic(full_width = F) %>% 
+  footnote(general = "ci: 95 % confidence intervals for linear regression, \n credible intervals for BART ") %>%
+  save_kable("BartLabor/bart_tab2_out.png", zoom = 3)
+```
+

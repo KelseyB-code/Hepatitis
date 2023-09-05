@@ -1,0 +1,55 @@
+---
+title: "Hepatitis EDA"
+output: 
+---
+
+```{r}
+rm(list=ls())
+
+library(tidyverse)
+dir.create("HepOut", showWarnings = FALSE)
+```
+
+Step 1. Load and clean data. 
+1.1 Format factors, replace missing values with NA, 
+```{r}
+hepatitis_in <- read_csv("Hepatitis.data", col_names = c("class", "age", "sex", "steroid", "antivirals", "fatigue", "malaise", "anorexia",
+  "liver_big", "liver_firm", "spleen_palpable", "spiders", "ascites", "varices",
+  "bilirubin", "alk_phos", "sgot", "albumin", "protime", "histology"))
+
+hepatitis <- hepatitis_in %>%
+  mutate(class = as_factor(case_when(class == 2 ~ "live", TRUE ~ "die")),
+         sex = as_factor(case_when(sex == 2 ~ "female", TRUE ~ "male")),
+         antivirals = as_factor(antivirals),
+         histology = as_factor(histology)) |> 
+  mutate(across(where(is.character), ~na_if(., "?"))) |> 
+  relocate(histology, .before = 4) |> 
+  mutate(across(bilirubin:protime, as.numeric)) |> 
+  mutate_if(is.character, as.factor) |> 
+  mutate(across(histology:varices, .fns = ~ case_when(. == 1 ~ "no",
+                                                     . == 2 ~ "yes")))
+write.csv(hepatitis, "hepatitis.csv")
+```
+Generate table of descriptive statistics and save to output folder.
+
+```{r}
+allvars <- colnames(hepatitis)
+allvars <- allvars[allvars!='class'] 
+catvars <- colnames(hepatitis)[c(1, 3:15)]
+
+#Descriptive Statistics:
+tab1 <- CreateTableOne(vars = allvars, strata="class", data = hepatitis, factorVars = catvars) 
+
+kableone(tab1, caption = "Table 1: Descriptive Statistics", col.names=c("Live", "Die", "p", "")) %>%
+  remove_column(5) %>%
+  kable_classic(full_width = F) %>%
+  save_kable("HepOut/DescriptiveStats.png", zoom = 3)
+```
+
+More potentially helpful EDA functions.
+
+```{r}
+skimr::skim(hepatitis)
+hepatitis |> view()
+```
+
